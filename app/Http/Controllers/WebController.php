@@ -45,28 +45,19 @@ class WebController extends Controller
      * Display the specified resource.
      */
 
-    public function findRiders(string $restaurant_id): \Illuminate\Http\JsonResponse
+    public function findRiders(string $restaurant_id)
     {
         try {
             $restaurant = Resturents::where('restaurant_id', $restaurant_id)->first();
             if ($restaurant) {
-                $movements = RiderMovements::all();
+                $rider = collect(DB::select("SELECT rider_id, latitude, longitude, SQRT(POW(69.1 * (latitude - $restaurant->latitude), 2) + POW(69.1 * ($restaurant->longitude - longitude) * COS(latitude / 57.3), 2)) AS distance FROM rider_movements where `movement_time` <= '".date('Y-m-d H:i:s', strtotime('-5 minutes'))."' ORDER BY distance asc limit 1"))->first();
 
-                $riderIds=[];
-                foreach ($movements as $movement){
-                    $distance = calculateDistance($restaurant->latiture, $restaurant->longitude, $movement->latitude,
-                        $movement->longitude);
-
-                    $rider = RiderMovements::select(DB::raw('*, ( 6367 * acos( cos( radians(' . $restaurant->latiture . ') ) * cos( radians( lat ) ) * cos( radians( lng ) - radians(' . $restaurant->longitude . ') ) + sin( radians(' . $restaurant->latiture . ') ) * sin( radians( lat ) ) ) ) AS distance'))
-                        ->having('distance', '<', $distance)
-                        ->orderBy('distance')->first();
-
-                    $riderIds[] = $rider->rider_id;
-                }
-
-                $riders = Riders::whereIn('id',$riderIds)->get();
-
-                return response()->json($riders);
+                return response()->json([
+                    'rider' => Riders::find($rider->rider_id),
+                    'distance' => $rider->distance,
+                    'latitude' => $rider->latitude,
+                    'longitude' => $rider->longitude,
+                ], 200);
             }
             return response()->json('No data found', 404);
         } catch (\Throwable $th) {
